@@ -97,7 +97,7 @@ def loadplanet(filename):
     return t, m2, r2, phi2
 
 
-def radial_diag(file):
+def radial_diag(file,mach):
     t,r_ax,r,phi,prim,plan,diag = loadcheckpoint(file)
     # diag[:,0] = rho
     # diag[:,1] = mdot
@@ -111,16 +111,26 @@ def radial_diag(file):
     angmom = diag[:,3]
     omega  = diag[:,4]
 
+    a = plan[1,3]
+    q = plan[1,0]
+    om2 = plan[1,2]
+
+    sigma_0 = 1.
+    # type 1 torque:
+    T_0 = q**2 * mach**2 * sigma_0 * a**4 * om2**2
+    print T_0
 
     f, (ax1, ax2) = plt.subplots(2, sharex=True, sharey=False)
-    ax1.plot(r_ax,rhoavg,color='r')
+    ax1.plot(r_ax-a,rhoavg,color='r')
     ax1.set_yscale('log')
     ax1.set_ylabel(r'$\rho$')
 
-    ax2.plot(r_ax,torq,color='darkcyan')
+    ax2.plot(r_ax-a,torq,color='darkcyan')
     ax2.set_ylabel(r'$\Gamma_{\phi}$')
-    ax2.set_yscale('log')
-    ax2.set_ylim([1e-6,1e2])
+    ax2.set_xlim([-0.75,0.75])
+    ax2.set_xlabel(r'$r - r_2$')
+    #ax2.set_yscale('log')
+    #ax2.set_ylim([1e-5,1e2])
     #ax2.set_ylabel(r'$l$')
 
     # Fine-tune figure; make subplots close to each other and hide x ticks for
@@ -215,16 +225,17 @@ def zoom_cont(file):
     triang.set_mask(mask)
 
 
-    cnt = plt.tricontourf(triang,np.log10(dens),200,cmap=cmaps.inferno)
+    cnt = plt.tricontourf(triang,np.log10(dens),100,cmap=cmaps.inferno, rasterized=True)
 
+    plt.clim(vmin=-1.5,vmax=1.3)
     # This is the fix for the white lines between contour levels
     for c in cnt.collections:
         c.set_edgecolor("face")
 
-    #plt.xlim([x_plan_rot-0.4,x_plan_rot+0.4])
-    #plt.ylim([y_plan_rot-0.4,y_plan_rot+0.4])
-    plt.colorbar(label=r'$\log{\rho}$')
-    plt.annotate(r'$%i \, \rm orb$'%orb,xy=(x_plan_rot+0.2,y_plan_rot+0.32),color='white')
+    plt.xlim([x_plan_rot-0.5,x_plan_rot+0.5])
+    plt.ylim([y_plan_rot-0.5,y_plan_rot+0.5])
+    plt.colorbar(label=r'$\log{\Sigma}$')
+    #plt.annotate(r'$%i \, \rm orb$'%orb,xy=(x_plan_rot+0.2,y_plan_rot+0.32),color='white')
 
     plt.show()
 
@@ -258,6 +269,47 @@ def readtorque(chk_file,rep_file,mach):
 
     return avg_torq
 
+# new version given the smoothed torq!
+def plottorq(dir,mach,drift,chk_num):
+    t,torque,torque2 = np.genfromtxt('%s/smoothed.txt'%dir,unpack=True)
+    check_file = '%scheckpoint_%s.h5'%(dir,chk_num)
+    t_snap,r_ax,r,phi,prim,plan,diag = loadcheckpoint(check_file)
+
+    # latest distance of secondary
+    a = plan[1,3]
+
+    # ang velocity of secondary
+    om2 = plan[1,2]
+
+
+    q = plan[1,0]
+    sigma_0 = 1.
+    # type 1 torque:
+    T_0 = q**2 * mach**2 * sigma_0 * a**4 * om2**2
+
+    orb = t/2/np.pi
+
+    plt.plot(orb,torque/T_0,color='#48BBD0',alpha=0.5)
+    plt.xlabel(r'$t \, \rm [orb]$')
+    plt.ylabel(r'$\rm T/T_0$')
+    plt.xlim([orb[0],orb[-1]])
+    plt.ylim([-1,1])
+
+    plt.close()
+    # horizontal dotted line at y=0
+    plt.axhline(y=0., xmin=0, xmax=1300, linewidth=0.5, linestyle='--',color='k')
+
+    print 'averaging over ',orb[-1] - orb[-51],' orbits '
+
+    avg_torq = np.average(torque[-51:-1]/T_0)
+    #print 'avg normalized torque = ',avg_torq
+
+    #plt.tight_layout()
+    plt.show()
+
+    #return orb, torque/T_0
+    return avg_torq
+
 
 
 def plottorque(dir,mach,drift,savedir, chk_num):
@@ -265,16 +317,6 @@ def plottorque(dir,mach,drift,savedir, chk_num):
     check_file = dir + 'checkpoint_%s.h5'%chk_num
     t, torque, torque2, r2 = loadreport(rep_file)
     t_snap,r_ax,r,phi,prim,plan,diag = loadcheckpoint(check_file)
-
-
-    # This doesn't make sense because the torque
-    # changes over time, and this is the separation
-    # at a single snap shot....
-    # Shouldn't we normalize it by the Type I torque
-    # throughout the evolution?
-    # I think this doesn't matter much because the separation 
-    # doesn't vary that much and we are more concerned with the sign.
-    # OK to just normalize by the latest value of Type I torque
 
     # latest distance of secondary
     a = plan[1,3]
@@ -298,13 +340,13 @@ def plottorque(dir,mach,drift,savedir, chk_num):
 
     window = int(orb[-1]-orb[0])/2
     print 'window = ',window
-    #poly_order = 3
-    #smoothed = savitzky_golay(torque[cut:]/T_0, window, poly_order)
+    poly_order = 3
+    #smoothed = savitzky_golay(torque/T_0, window, poly_order)
     #smoothed = signal.medfilt(torque[cut:]/T_0,1115)
     smoothed = pd.rolling_mean(torque/T_0,window)
 
     #plt.plot(orb,torque/T_0,color='#48BBD0',alpha=0.5)
-    plt.plot(orb,smoothed,color='#C20000')
+    plt.plot(orb[::100],smoothed[::100],color='#C20000')
     plt.xlabel(r'$t \, \rm [orb]$')
     plt.ylabel(r'$\rm T/T_0$')
     plt.xlim([orb[0],orb[-1]])
