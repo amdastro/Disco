@@ -97,6 +97,110 @@ def loadplanet(filename):
     return t, m2, r2, phi2
 
 
+def grav_pot_cell(r, phi, r_p, phi_p, M_1):
+    '''
+    this reads in coordinate data (r,phi) for ONE CELL in the grid
+    and the planet data (r_p, phi_p). probably the primary pplanet.
+    * Needs to be adapted for the secondary / the enire binary.
+    This can later be summed up over all cells in another function.
+
+    Adapted from Paul's DISCO planetaryForce() routine
+    '''
+
+    dx = r*np.cos(phi) - r_p*np.cos(phi_p)
+    dy = r*np.sin(phi) - r_p*np.sin(phi_p)
+
+    script_r = np.sqrt(dx**2+dy**2)
+
+    f1 = M_1/np.sqrt(dx**2 + dy**2)
+    # f2 = ??
+
+    cosa = dx/script_r 
+    sina = dy/script_r 
+
+    cosa_p = cosa*np.cos(phi_p) + sina*np.sin(phi_p)
+    sina_p = sina*np.cos(phi_p) + cosa*np.sin(phi_p) 
+
+    f_r = cosa_p*f1 
+    f_phi = sina_p * f1
+
+    return f_r, f_phi
+
+
+
+def grav_pot_1(file):
+    t,r_ax,r,phi,prim,plan,diag = loadcheckpoint(file)
+
+    dens = prim[:,0]
+    orb = t/2./np.pi
+
+    # where is the planet?
+    r_p = plan[0,3]
+    r_p2 = plan[1,3]
+    phi_p = plan[0,4] # this is in radians
+    phi_p2 = plan[1,4]
+    x_plan = np.multiply(r_p,np.cos(phi_p))
+    y_plan = np.multiply(r_p,np.sin(phi_p))
+    x_plan2 = np.multiply(r_p2,np.cos(phi_p2))
+    y_plan2 = np.multiply(r_p2,np.sin(phi_p2))
+
+    f_r = np.zeros(len(phi))
+    f_phi = np.zeros(len(phi))
+
+    # MASS = 1 for primary
+    M1 = 1.
+
+    # fi
+    for i in range(0,len(phi)):
+        f_r[i],f_phi[i] = grav_pot_cell(r[i],phi[i],r_p,phi_p,M1)
+
+
+    # Now triangulate with x,y to contour the data
+
+    x = np.multiply(r,np.cos(phi)) 
+    y = np.multiply(r,np.sin(phi))
+
+    # rotate the grid
+    a = -phi_p2
+    x_rot = x*np.cos(a) - y*np.sin(a)
+    y_rot = y*np.cos(a) + x*np.sin(a)
+    x_plan2_rot = x_plan2*np.cos(a) - y_plan2*np.sin(a)
+    y_plan2_rot = y_plan2*np.cos(a) + x_plan2*np.sin(a)
+
+    triang = tri.Triangulation(x_rot, y_rot)
+    # mask off unwanted traingles
+    min_radius = 1.01*np.min(r)
+    xmid = x[triang.triangles].mean(axis=1)
+    ymid = y[triang.triangles].mean(axis=1)
+    mask = np.where(xmid*xmid + ymid*ymid < min_radius*min_radius, 1, 0)
+    triang.set_mask(mask)
+
+    ###fig, ax = plt.subplots()
+    cnt = plt.tricontourf(triang,f_phi,100,cmap=cmaps.inferno, rasterized=True)
+    plt.colorbar(label=r'$f_{\phi}$')
+
+
+    # Plot circles for the planets
+    fig = plt.gcf()
+    ax = fig.gca()
+    # Define the positions (secondary is rotated to phi=0)
+    planet1 = plt.Circle((x_plan, y_plan), 0.05, color='#1A7989')
+    planet2 = plt.Circle((x_plan2_rot, y_plan2_rot), 0.03, color='#1A7989')
+    ax.add_artist(planet1)
+    ax.add_artist(planet2)
+
+
+    #plt.clim(vmin=-1.5,vmax=1.3)
+    # This is the fix for the white lines between contour levels
+    for c in cnt.collections:
+        c.set_edgecolor("face")
+
+    plt.show()
+
+
+
+
+
 def radial_diag(file,mach):
     t,r_ax,r,phi,prim,plan,diag = loadcheckpoint(file)
     # diag[:,0] = rho
@@ -289,13 +393,13 @@ def plottorq(dir,mach,drift,chk_num):
 
     orb = t/2/np.pi
 
-    plt.plot(orb,torque/T_0,color='#48BBD0',alpha=0.5)
+    plt.plot(orb,torque2/T_0,color='#48BBD0',alpha=0.5)
     plt.xlabel(r'$t \, \rm [orb]$')
     plt.ylabel(r'$\rm T/T_0$')
     plt.xlim([orb[0],orb[-1]])
-    plt.ylim([-1,1])
+    #plt.ylim([-1,1])
 
-    plt.close()
+    #plt.close()
     # horizontal dotted line at y=0
     plt.axhline(y=0., xmin=0, xmax=1300, linewidth=0.5, linestyle='--',color='k')
 
