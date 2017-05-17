@@ -102,11 +102,12 @@ def fgrav_cell(r, phi, r_p, phi_p, M):
     this reads in coordinate data (r,phi) for ONE CELL in the grid
     and the planet data (r_p, phi_p), and calculates
     the gravitational force ON the planet BY the gas.
-    **Need to add in mass for force**
+
+    ** Need to multiply by density of gas to get force **
+
     Summing this up over both planets gives components
     of the gravitational force on the binary by the gas.
 
-    Adapted from Paul's DISCO planetaryForce() routine
     '''
 
     dx = r*np.cos(phi) - r_p*np.cos(phi_p)
@@ -127,6 +128,14 @@ def fgrav_cell(r, phi, r_p, phi_p, M):
     f_phi = sina_p * f
 
     return f, f_r, f_phi
+
+def zgrav(r,phi,r_p,phi_p,M):
+    theta=phi_p-phi
+    r1=r**2 + r_p**2 -2*r*r_p*np.cos(theta)
+    F=-M/r1**2
+    sAlpha=np.sin(theta)*r_p/r1
+    cAlpha=np.sqrt(1-sAlpha**2)
+    return F,cAlpha*F,sAlpha*F
 
 
 
@@ -158,8 +167,8 @@ def fgrav_cont(file):
     # 
     for i in range(0,len(phi)):
         f_1,f_r1,f_phi1 = fgrav_cell(r[i],phi[i],r_p,phi_p,M1) 
-        f_2,f_r2,f_phi2 =  fgrav_cell(r[i],phi[i],r_p2,phi_p2,M2)
-        f_r[i] = f_r1 + f_r2
+        f_2,f_r2,f_phi2 = fgrav_cell(r[i],phi[i],r_p2,phi_p2,M2)
+        f_r[i] = f_r1
         f_phi[i] = f_phi1 + f_phi2
         f_tot[i] = f_1 + f_2
 
@@ -201,7 +210,7 @@ def fgrav_cont(file):
     #planet2 = plt.Circle((x_plan2_rot, y_plan2_rot), 0.03, color='k')
     #ax.add_artist(planet1)
     #
-    ax.add_artist(planet2)
+    #ax.add_artist(planet2)
 
 
     #plt.clim(vmin=-1.5,vmax=1.3)
