@@ -29,13 +29,35 @@ from scipy.signal import savgol_filter
 plt.close("all")
 
 
-import colormaps as cmaps
-plt.rcParams['font.size'] = 25
-plt.rcParams['legend.fontsize'] = 16
-plt.rcParams['lines.linewidth'] = 2
-from matplotlib import rc
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-rc('text', usetex=True)
+#import colormaps as cmaps
+
+label_size = 16
+fontsize = 16
+
+#plt.rc('font', family='serif', serif='Times')
+plt.rc('text', usetex=True)
+plt.rc('xtick', labelsize=label_size)
+plt.rc('ytick', labelsize=label_size)
+plt.rc('axes', labelsize=label_size)
+plt.rc({'figure.autolayout': True})
+
+
+
+plt.rcParams['lines.linewidth'] = 2.
+
+from matplotlib.colors import ListedColormap, BoundaryNorm
+
+import seaborn as sns
+
+
+cmapgreen = ListedColormap(sns.cubehelix_palette(10, start=.5, rot=-.75))
+cmappink = ListedColormap(sns.cubehelix_palette(10,dark=0.25, light=0.9, hue=1.2, rot=.5))
+cmappink_r = ListedColormap(sns.cubehelix_palette(10,dark=0.2, light=0.9, hue=1.2, rot=.5,reverse=True))
+cmap_cf = ListedColormap(sns.cubehelix_palette(10, start=2.2, dark=0.3, light=0.85, rot=.7, hue=1.2, gamma=.7))
+cmap_purp = sns.cubehelix_palette(40,dark=0., light=0.9, hue=1., gamma=.7, rot=.5,start=2.3,as_cmap=True)
+
+# diverging
+cmap_rdbu = sns.diverging_palette(220, 20, sep=20, as_cmap=True)
 
 '''
 prim[:,0] = rho
@@ -143,28 +165,33 @@ def loadcheckpoint(filename):
 
 
 def loadreport(filename):
-    # old runs:
-    #t,torque,torque_halfeps,torque_eps,torque_hill,r2,p2,mdot,jdot,fr = np.genfromtxt(filename,unpack=True,usecols=(0,1,2,3,4,6,7,8,9,10))
 
     t,torque,torque_hill,r2,p2,mdot,jdot,fr = np.genfromtxt(filename,unpack=True,usecols=(0,1,2,4,5,6,7,8))
     orb = t/(2.*np.pi)
 
-    #return orb, torque, torque_halfeps, torque_eps, torque_hill, r2, p2, mdot, jdot, fr
+
+    # get rid of overlap from simualtion restarts
+    uniq_orb, ind = np.unique(orb,return_index=True)
+    orb = orb[ind]
+    r2 = r2[ind]
+    p2 = p2[ind]
+    fr = fr[ind]
+    torque = torque[ind]
+    torque_hill = torque_hill[ind]
+    mdot = mdot[ind]
+    jdot = jdot[ind]
+
+
     return orb, torque, torque_hill, r2, p2, mdot, jdot, fr
 
 
-def physical(file):
-    '''just plot some things in physical units with the conversion factors weve chosen '''
-    orb, torque, torque_halfeps, torque_eps, torque_hill, r2, p2, mdot2, jdot2 = loadreport(rep_file)
+def loadreport_old(filename):
+    # old runs:
+    t,torque,torque_halfeps,torque_eps,torque_hill,r2,p2,mdot,jdot,fr = np.genfromtxt(filename,unpack=True,usecols=(0,1,2,3,4,6,7,8,9,10))
+    orb = t/(2.*np.pi)
 
-    # 1 code time = 155.85 sec real time
-    t_scale = 155.85  # sec
-    # 1 code distance unit = 5 rS(M) where M=10^6 Msun
-    Msun = 1.98e33
-    M = 1.e6*Msun
-    G = 6.67e-8
-    c = 2.99e10
-    r_scale = 5.*2.*G*M/c**2
+    return orb, torque, torque_halfeps, torque_eps, torque_hill, r2, p2, mdot, jdot, fr
+
 
 
 
@@ -464,7 +491,7 @@ def vel_field(file):
     vely = velr*np.sin(phi) + velp_co*np.cos(phi)
 
     res = 512
-    vel_res = 70
+    vel_res = 110
     # convert this data to 2d data in x,y
     x_ax, y_ax, dens_2d = xy_interp(r,phi,dens,phi_p2,res)
     x_ax2, y_ax2, velx_2d = xy_interp(r,phi,velx,phi_p2,vel_res)
@@ -484,17 +511,17 @@ def vel_field(file):
     U = velx_2d *5#/ np.sqrt(velx_2d**2 + vely_2d**2);
     V = vely_2d *5#/ np.sqrt(velx_2d**2 + vely_2d**2);
 
-    r_hill = (1e-3/3)**(1./3)*r_p2
+    r_hill = (m_p2/3)**(1./3)*r_p2
     eps = plan[1,5]
 
     fig=plt.figure()
-    cnt = plt.contourf(x_ax,y_ax,np.log10(dens_2d),100,cmap=cmaps.magma, rasterized=True)
+    cnt = plt.contourf(x_ax,y_ax,np.log10(dens_2d),100,cmap='magma_r', rasterized=True)
     plt.clim(vmin=-1.8,vmax=3.0)
     cbar = fig.colorbar(cnt, ticks=[-1, 0, 1, 2, 3],label=r'$\Sigma$')
     cbar.ax.set_yticklabels([r'$10^{-1}$', r'$10^{0}$', r'$10^{1}$', r'$10^{2}$', r'$10^{3}$'])
     
-
-    plt.quiver(x_ax2,y_ax2,U,V,pivot='mid',scale=6, scale_units='inches',color='#9FF781',width=.005)
+    #9FF781
+    plt.quiver(x_ax2,y_ax2,U,V,pivot='mid',scale=6, scale_units='inches',color='#2D1F4D',width=.0035)
 
     #plt.streamplot(x_ax2,y_ax2,U,V,color='k',density=100) ## this is slow
 
@@ -512,6 +539,8 @@ def vel_field(file):
     plt.ylabel(r'$y \, [r_{0}]$')
     plt.xlim([r_p2-0.25,r_p2+0.25])
     plt.ylim([-0.25,0.25])
+    # plt.xlim([r_p2-0.5,r_p2+0.5])
+    # plt.ylim([-0.5,0.5])
 
     plt.show()
 
@@ -613,15 +642,17 @@ def torq_cont(file,mach,f_rH):
     fig = plt.figure(figsize=(8,6))
     #contour_neg = -np.linspace(1,(np.max(torq)),50)[::-1]
     #contour_pos = np.linspace(1,(np.max(torq)),50)
-    contour_levels = np.linspace(-0.995*np.max(abs(torq)),0.995*np.max(abs(torq)),60)
+    #   contour_levels = np.linspace(-0.995*np.max(abs(torq/np.max(torq))),0.995*np.max(abs(torq/np.max(torq))),60)
+    contour_levels = np.linspace(-1.*np.max(abs(torq/np.max(torq))),1.*np.max(abs(torq/np.max(torq))),60)
+
     #contour_levels = np.append(contour_neg,contour_pos)
-    cnt = plt.tricontourf(triang,torq,contour_levels,\
-        cmap='RdBu', rasterized=True)
+    cnt = plt.tricontourf(triang,torq/np.max(torq),contour_levels,\
+        cmap=cmap_rdbu, rasterized=True)
 
 
     #cbar = fig.colorbar(cnt, ticks=[-0.6,-0.4,-0.2,0.,0.2,0.4,0.6],label=r'$T_{\rm code}$')
     #cbar = fig.colorbar(cnt,ticks=[-10000.,-5000., 0., 5000., 10000.],label=r'$T_{\rm code}$')
-    cbar = fig.colorbar(cnt,label=r'$T_{\rm code}$')
+    cbar = fig.colorbar(cnt,label=r'$T_{\rm code}$',ticks=[-1.0,-0.5,0.,0.5,1.0])
     #cbar.ax.set_yticklabels([r'$10^{-1}$', r'$10^{0}$', r'$10^{1}$', r'$10^{2}$', r'$10^{3}$'])
     #plt.clim(vmin=-2.1,vmax=2.1)
 
@@ -1007,12 +1038,12 @@ def zoom_cont(file):
     #contour_levels =np.exp(np.linspace(math.log(1e-3),math.log(5e2),200))
 
     fig=plt.figure()
-    cnt = plt.tricontourf(triang,np.log10(dens),100,cmap=cmaps.magma, rasterized=True)
-    plt.clim(vmin=-1.,vmax=1.)
+    cnt = plt.tricontourf(triang,np.log10(dens),100,cmap='magma_r', rasterized=True)
+    #plt.clim(vmin=-1.,vmax=1.)
 
 
     # plot radial grid boundaries
-    #plt.plot(x_grid,y_grid,'k',linewidth=0.5)
+    plt.plot(x_grid,y_grid,'k',linewidth=0.5)
     # one row of horizontal lines just to approx cell position
     #plt.axhline(y=0.002, xmin=0, xmax=10, linewidth=0.5,color='k')
     #plt.axhline(y=-0.002, xmin=0, xmax=10, linewidth=0.5,color='k')
@@ -1022,15 +1053,15 @@ def zoom_cont(file):
     cbar.ax.set_yticklabels([r'$10^{-1}$', r'$10^{0}$', r'$10^{1}$', r'$10^{2}$', r'$10^{3}$'])
 
     # This is the fix for the white lines between contour levels
-    #for c in cnt.collections:
-    #    c.set_edgecolor("face")
+    for c in cnt.collections:
+       c.set_edgecolor("face")
 
     #cont_lines = np.linspace(-0.7*np.max(prim[:,0]),0.7*np.max(prim[:,0]),4)
     #clines = plt.tricontour(triang,np.log10(dens),cont_lines,alpha=0.7,colors='white',linewidth=1)
 
 
-    #plt.xlim([x_plan2_rot-0.5,x_plan2_rot+0.5])
-    #plt.ylim([y_plan2_rot-0.5,y_plan2_rot+0.5])
+    plt.xlim([x_plan2_rot-0.25,x_plan2_rot+0.25])
+    plt.ylim([y_plan2_rot-0.25,y_plan2_rot+0.25])
     #plt.xlim([-2.8,2.8])
     #plt.ylim([-2.8,2.8])
     plt.xlabel(r'$x \, [r_{0}]$')
@@ -1041,20 +1072,20 @@ def zoom_cont(file):
     fig = plt.gcf()
     ax = fig.gca()
     hillsph = plt.Circle((x_plan2_rot, y_plan2_rot), r_hill, \
-         fill=False, color='#FF3850',linestyle='dashed',alpha=0.9,linewidth=1)
+         fill=False, color='#FF3850',linestyle='--',alpha=0.9,linewidth=1)
     smooth = plt.Circle((x_plan2_rot, y_plan2_rot), eps, \
-         fill=False, color='orange',alpha=0.7)
+         fill=False, color='white',linestyle='dotted',alpha=0.7)
 
     print 'rhill boundaries in rS = ', 5.*(-r_hill), 5.*(+r_hill)
     print 'eps boundaries in rS = ', 5.*(-eps), 5.*(+eps)
     
-    #ax.add_artist(smooth)
-    #ax.add_artist(hillsph)
+    ax.add_artist(smooth)
+    ax.add_artist(hillsph)
 
     plt.tight_layout()
 
     plt.show()
-    return 
+    return triang, dens
 
 
 
@@ -1330,37 +1361,37 @@ def torqfit(dir, alpha):
 
 
 
-def plottorque(window,dir,q,w):
+def plottorque(window,dir,q,mach,w):
     rep_file = dir+'report.dat'
 
     #old files!   
-    #orb, torque, torque_halfeps, torque_eps, torque_hill, r2, p2, mdot2, jdot2,fr = loadreport(rep_file)
+    #orb, torque, torque_halfeps, torque_eps, torque_hill, r2, p2, mdot2, jdot2,fr = loadreport_old(rep_file)
     orb, torque, torque_hill, r2, p2, mdot2, jdot2, fr2 = loadreport(rep_file)
 
-    mach = 20.
-    # read in q
-    #q = 1.e-3
+    #mach = 20.
+
     sigma_0 = 1.
-    #alpha = 0.01
 
     # scale r to schwarszchild radii
-    # This is only right for the initial q, will wanna rescale for other qs to keep in LISA band
-    rscale = 5.
+    # Get r0 scaling in Rs for the given migraiton rate w and mass ratio q
+    rscale = (-1./w * 8./5 * 2**0.5 * 1./((1.+1./q)*(1.+q)))**(2./5)
+
     # type 1 torque:
     # T0 is an array of length len(total torque)
     # (dont have updated omega in repfile, but we have r_p)
     # Still in simulation units.
     om2 = 1./r2**(3./2)
     # Density has radial dependence too -- 
-    
+
     sigma = sigma_0 * r2**(-0.5)
     T_0 =  r2**4 * om2**2 * sigma * q**2 * mach**2 
+
     # viscous torque:
     #T_nu =  3*np.pi*r2**4 * om2**2 * sigma * alpha * 1./mach**2
 
     # cut data from beginning out for smoothing
     # provide index to cut out till
-    cut = 100
+    cut = np.where(orb > 1000)[0][0]
     torque = torque[cut:]
     torque_hill = torque_hill[cut:]
     T_0 = T_0[cut:]
@@ -1369,33 +1400,35 @@ def plottorque(window,dir,q,w):
     orb = orb[cut:]
 
     #window = int(orb[-1]-orb[0])/2
-    poly_order = 3
+    #poly_order = 3
     #smoothed = savitzky_golay(torque/T_0, window, poly_order)
-    #smoothed = signal.medfilt(torque[cut:]/T_0,1115)
-    smoothed = pd.rolling_mean(torque,window) 
-    smoothed_hill = pd.rolling_mean(torque_hill,window)
-    jdot_s = pd.rolling_mean(jdot2/mdot2,window)
+    #smoothed = pd.rolling_mean(torque,window) 
+    #smoothed_hill = pd.rolling_mean(torque_hill,window)
+    #jdot_s = pd.rolling_mean(jdot2/mdot2,window)
+    smoothed = pd.Series(torque).rolling(window).mean()
+    smoothed_hill = pd.Series(torque_hill).rolling(window).mean()
+    jdot_s = pd.Series(jdot2/mdot2).rolling(window).mean()
 
     #cut_ind = np.where(orb>100)[0][0]
 
 
     #plot as a function of adot/(omega*a)
-    #w = -4.039e-5
     adot_omegaa = w*r2**(-5./2.)
-    # THIS IS ADOT over A
-    #adot_omegaa = w*r2**(-4.)
 
     # CONVERT TO PHYSICAL UNITS
     G = 6.67e-8
     c = 2.99e10
     Msun = 1.98e33
     M = 1.e6*Msun
-    r0 = rscale*G*M/c**2
-    sigma_scale = 1.e7
+    r0 = rscale*2*G*M/c**2
+    
 
-    torq_gas = smoothed * sigma_scale * G * r0
+   
+    C = 64./5. * G**3/c**5 * (M+q*M)**3/(1.+1./q)/(1.+q)
 
-    C = 64./5. * G**3/c**5 * (M+q)**3/(1.+1./q)/(1.+q)
+    # Get separation in cgs units for GW torque
+    # Simulations with small q will correspond to inside ISCO separation
+    # so GW torque is not directly meaningful
     a = r2*r0
     adot = C/(a)**3
 
@@ -1403,7 +1436,6 @@ def plottorque(window,dir,q,w):
 
     # Compare GW torque
     # torque total
-    # torque with hill sphere excised (or some fraction of it?)
 
     rax = r2*rscale
 
@@ -1436,16 +1468,16 @@ def plottorque(window,dir,q,w):
     #plt.show()
 
 
-    cutnans = window
-    smoothed = smoothed[cutnans:]
-    smoothed_hill = smoothed_hill[cutnans:]
-    T_0 = T_0[cutnans:]
-    adot_omegaa = adot_omegaa[cutnans:]
-    r2 = r2[cutnans:]
-    adot = adot[cutnans:]
-    om2 = om2[cutnans:]
-    a = a[cutnans:]
-    orb = orb[cutnans:]
+    cutnans = -1
+    smoothed = smoothed[:cutnans]
+    smoothed_hill = smoothed_hill[:cutnans]
+    T_0 = T_0[:cutnans]
+    adot_omegaa = adot_omegaa[:cutnans]
+    r2 = r2[:cutnans]
+    adot = adot[:cutnans]
+    om2 = om2[:cutnans]
+    a = a[:cutnans]
+    orb = orb[:cutnans]
 
     return orb, r2, adot_omegaa, smoothed, smoothed_hill, T_0
     #return r2, adot_omegaa, smoothed, smoothed_hill, T_0, adot, om2, a
@@ -1585,8 +1617,8 @@ def plottorq_cgs(dir,q):
     c = 2.99e10
     Msun = 1.98e33
     M = 1.e6*Msun
-    r0 = rscale*G*M/c**2
-    sigma_0 = 6.2e6
+    r0 = rscale*2*G*M/c**2
+    #sigma_0 = 6.2e6
 
     # a is cgs distance (cm)
     a = r2*r0
@@ -1624,18 +1656,14 @@ def plottorq_cgs(dir,q):
     # Scale torque to cgs units
     T_scale = G*M*sigma_0*r0
 
-
     # Density has radial dependence  
     sigma = sigma_0 * (r2)**(-0.5)
-
 
     # TYPE I TORQUE (SCALING)
     T_0 =  a**4 * om2**2 * sigma * q**2 * mach**2 
 
-
     # VISCOUS TORQUE
     torq_nu =  3*np.pi*a**4 * om2**2 * sigma * alpha * 1./mach**2
-
 
     # GAS TORQUE
     torq_gas = smoothed *T_scale
@@ -1643,7 +1671,6 @@ def plottorq_cgs(dir,q):
 
     # ACCRETION TORQUE
     torq_acc = jdot_s*T_scale
-
 
     # GW TORQUE
     C = 64./5. * G**3/c**5 * (M+q*M)**3/(1.+1./q)/(1.+q)
