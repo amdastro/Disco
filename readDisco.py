@@ -41,6 +41,8 @@ plt.rc('ytick', labelsize=label_size)
 plt.rc('axes', labelsize=label_size)
 plt.rc({'figure.autolayout': True})
 
+plt.rcParams['axes.facecolor'] = 'whitesmoke'
+
 
 
 plt.rcParams['lines.linewidth'] = 2.
@@ -57,7 +59,7 @@ cmap_cf = ListedColormap(sns.cubehelix_palette(10, start=2.2, dark=0.3, light=0.
 cmap_purp = sns.cubehelix_palette(40,dark=0., light=0.9, hue=1., gamma=.7, rot=.5,start=2.3,as_cmap=True)
 
 # diverging
-cmap_rdbu = sns.diverging_palette(220, 20, sep=20, as_cmap=True)
+cmap_rdbu = sns.diverging_palette(20, 220, sep=20, as_cmap=True)
 
 '''
 prim[:,0] = rho
@@ -583,7 +585,7 @@ def torq_cont(file,mach,f_rH):
     M1 = plan[0,0]
     M2 = plan[1,0]
 
-    q = 1.e-3
+    q = M2/M1
     sigma_0 = 1.
     om2 = 1./r_p2**(3./2)
     T_0 =  r_p2**3 * om2**2 * sigma_0 * q**2 * mach**4
@@ -601,7 +603,7 @@ def torq_cont(file,mach,f_rH):
     f_phi_tot = f_phi1 + f_phi2
     # torq exerted by gas on just the secondary
     # NORMALIZED
-    torq = -dens*(f_phi2*r_p2) / T_0
+    torq = -dens*(f_phi2*r_p2) #/ T_0
 
 
     x = np.multiply(r,np.cos(phi)) 
@@ -615,7 +617,7 @@ def torq_cont(file,mach,f_rH):
     y_plan2_rot = y_plan2*np.cos(a) + x_plan2*np.sin(a)
 
     # Hill sphere
-    r_hill = (1e-3/3)**(1./3)*r_p2
+    r_hill = (q/3)**(1./3)*r_p2
     print 'r_hill = ',r_hill
 
     # Cut out a region around the planet
@@ -652,39 +654,40 @@ def torq_cont(file,mach,f_rH):
 
     #cbar = fig.colorbar(cnt, ticks=[-0.6,-0.4,-0.2,0.,0.2,0.4,0.6],label=r'$T_{\rm code}$')
     #cbar = fig.colorbar(cnt,ticks=[-10000.,-5000., 0., 5000., 10000.],label=r'$T_{\rm code}$')
-    cbar = fig.colorbar(cnt,label=r'$T_{\rm code}$',ticks=[-1.0,-0.5,0.,0.5,1.0])
+    cbar = fig.colorbar(cnt,label=r'$\frac{{\mathcal{T}}_{\rm code}}{{|\mathcal{T}}_{\rm max}|}$',ticks=[-1.0,-0.5,0.,0.5,1.0])
     #cbar.ax.set_yticklabels([r'$10^{-1}$', r'$10^{0}$', r'$10^{1}$', r'$10^{2}$', r'$10^{3}$'])
     #plt.clim(vmin=-2.1,vmax=2.1)
 
-    #plt.xlim([r_p2-0.25,r_p2+0.25])
-    #plt.ylim([-0.25,0.25])
-    #plt.xlim([r_p2-0.05,r_p2+0.05])
-    #plt.ylim([-0.05,0.05])
-    plt.xlim([0.5,1.5])
-    plt.ylim([-0.5,0.5])
-    plt.xlabel(r'$x \, [r_0]$')
-    plt.ylabel(r'$y \, [r_0]$')
+    
+    #plt.xlim([r_p2 - 0.5,r_p2+0.5])
+    #plt.ylim([-0.5,0.5])
+    plt.xlim([r_p2 - 0.2,r_p2+0.2])
+    plt.ylim([-0.2,0.2])
+    #plt.xlabel(r'$x \, [r_0]$')
+    #plt.ylabel(r'$y \, [r_0]$')
+    plt.tick_params(left=False, labelleft=False)
+    plt.tick_params(bottom=False, labelbottom=False)
     #plt.title(r'$\rm Torque \, density$')
 
 
     # rotated secondary position:
     plt.plot(x_plan2_rot,0.0,linestyle='none',marker='x',
-            color='black',markersize=7,markeredgewidth=1)
+            color='black',markersize=6,markeredgewidth=1)
     
 
     # Plot circles for the hill sphere, or planets
     fig = plt.gcf()
     ax = fig.gca()
     hillsph = plt.Circle((x_plan2_rot, y_plan2_rot), r_hill, \
-         fill=False, color='k',linestyle='dashed')
+         fill=False, color='k',alpha=0.6,ls='--')
     smooth = plt.Circle((x_plan2_rot, y_plan2_rot), eps2, \
-         fill=False, color='orange',alpha=0.7)
+         fill=False, color='#C68EF0',alpha=0.7)
     ax.add_artist(smooth)
     ax.add_artist(hillsph)
 
     cont_lines = np.linspace(-0.1*np.max(torq),0.1*np.max(torq),2)
     clines = plt.tricontour(triang,torq,cont_lines,alpha=0.7,colors='k',linewidths=0.75)
-    cont_lines2 = np.linspace(-0.4*np.max(torq),0.4*np.max(torq),2)
+    cont_lines2 = np.linspace(-0.5*np.max(torq),0.5*np.max(torq),2)
     clines2 = plt.tricontour(triang,torq,cont_lines2,alpha=0.7,colors='k',linewidths=1.5)\
 
     #cont_lines = np.linspace(-0.14*np.max(torq),0.14*np.max(torq),2)
@@ -694,11 +697,13 @@ def torq_cont(file,mach,f_rH):
 
 
     # This is the fix for the white lines between contour levels
-    #for c in cnt.collections:
-    #    c.set_edgecolor("face")
+    for c in cnt.collections:
+        c.set_edgecolor("face")
 
     #plt.tight_layout()
     plt.show()
+
+    print 'torq max = ',np.max(torq)
 
     return triang, torq
 
@@ -999,6 +1004,7 @@ def zoom_cont(file):
 
 
     # where is the planet?
+    M2 = plan[1,0]
     r2 = plan[1,3] * r0
     eps = plan[1,5] * r0
     phi2 = plan[1,4] # this is in radians
@@ -1011,7 +1017,7 @@ def zoom_cont(file):
     vely = np.multiply(velr,np.sin(vphi))
 
     # Hill radius
-    r_hill = (1e-3/3)**(1./3)*r2 * r0
+    r_hill = (M2/3)**(1./3)*r2 * r0
 
     # no rotation
     #x_rot = x
@@ -1037,9 +1043,11 @@ def zoom_cont(file):
 
     #contour_levels =np.exp(np.linspace(math.log(1e-3),math.log(5e2),200))
 
-    fig=plt.figure()
-    cnt = plt.tricontourf(triang,np.log10(dens),100,cmap='magma_r', rasterized=True)
-    #plt.clim(vmin=-1.,vmax=1.)
+    fig=plt.figure(figsize=(6.5,5))
+    #fig=plt.figure()
+
+    cnt = plt.tricontourf(triang,np.log10(dens),60,cmap=cmap_purp, crasterized=True)
+    #plt.clim(vmin=-2,vmax=3.5)
 
 
     # plot radial grid boundaries
@@ -1048,9 +1056,9 @@ def zoom_cont(file):
     #plt.axhline(y=0.002, xmin=0, xmax=10, linewidth=0.5,color='k')
     #plt.axhline(y=-0.002, xmin=0, xmax=10, linewidth=0.5,color='k')
 
-
-    cbar = fig.colorbar(cnt, ticks=[-1, 0, 1, 2, 3],label=r'$\Sigma$')
-    cbar.ax.set_yticklabels([r'$10^{-1}$', r'$10^{0}$', r'$10^{1}$', r'$10^{2}$', r'$10^{3}$'])
+    #cbar = fig.colorbar(cnt, ticks=[np.min(np.log10(dens)), 0, np.max(np.log10(dens))],label=r'$\log{(\Sigma/\Sigma_0)}$',format=r'$%.1f$',pad=0.03)
+    cbar = fig.colorbar(cnt, ticks=[-2, -1, 0, 1, 2, 3, 4],label=r'$\log{(\Sigma/\Sigma_0)}$',pad=0.03)
+    #cbar.ax.set_yticklabels([r'$10^{-2}$', r'$10^{0}$', r'$10^{2}$',r'$10^{3}$'])
 
     # This is the fix for the white lines between contour levels
     for c in cnt.collections:
@@ -1059,15 +1067,21 @@ def zoom_cont(file):
     #cont_lines = np.linspace(-0.7*np.max(prim[:,0]),0.7*np.max(prim[:,0]),4)
     #clines = plt.tricontour(triang,np.log10(dens),cont_lines,alpha=0.7,colors='white',linewidth=1)
 
+    #plt.title(r'$\mathcal{M} = 10$')
+
+    # remove ticks
+    #plt.tick_params(left=False, labelleft=False)
+    #plt.tick_params(bottom=False, labelbottom=False)
+    plt.xlabel(r'$x \, [r_{0}]$')
+    plt.ylabel(r'$y \, [r_{0}]$')
 
     plt.xlim([x_plan2_rot-0.25,x_plan2_rot+0.25])
     plt.ylim([y_plan2_rot-0.25,y_plan2_rot+0.25])
     #plt.xlim([-2.8,2.8])
     #plt.ylim([-2.8,2.8])
-    plt.xlabel(r'$x \, [r_{0}]$')
-    plt.ylabel(r'$y \, [r_{0}]$')
+ 
 
-    #plt.scatter([1.],[0.],color='k',marker='x',s=30)
+    #plt.scatter([1.],[0.],color='white',marker='x',s=20)
 
     fig = plt.gcf()
     ax = fig.gca()
